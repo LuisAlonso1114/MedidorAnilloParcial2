@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Medidor de anillo</title>
+<script src="vue.global.prod.js"></script>
+<style>
+:root{--bg:#f3f6f4;--card:#fff;--ink:#14231f;--mute:#5b6b66;--line:#d3ddd9;--acc:#0e6b5c;--acc2:#e3f1ed;--g:#bfe5cf;--y:#f6e7a8;--r:#f2c3bd;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1816;--card:#18241f;--ink:#e6f0ec;--mute:#9bb0a9;--line:#2b3b36;--acc:#4fd1b5;--acc2:#1b3a33;--g:#1f4a35;--y:#4d4417;--r:#552724}}
+:root[data-theme="dark"]{--bg:#0f1816;--card:#18241f;--ink:#e6f0ec;--mute:#9bb0a9;--line:#2b3b36;--acc:#4fd1b5;--acc2:#1b3a33;--g:#1f4a35;--y:#4d4417;--r:#552724}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,"Times New Roman",serif;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3,button,.ui,th{font-family:"Trebuchet MS","Segoe UI",Arial,sans-serif}
+main{max-width:640px;margin:0 auto;padding:14px 16px}
+h1{font-size:1.35rem;margin:6px 0 2px}h2{font-size:1.15rem;margin:18px 0 8px}h3{font-size:1rem;margin:14px 0 6px}
+p,li{max-width:62ch}.mute{color:var(--mute);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+.big{font:700 3rem/1 "Trebuchet MS",Arial,sans-serif;color:var(--acc)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.grid div{background:var(--acc2);border-radius:10px;padding:8px;text-align:center;font-size:.8rem}
+.grid b{display:block;font-size:1.05rem}
+.stage{height:150px;display:flex;align-items:center;justify-content:center;gap:24px;overflow:hidden;border:1px dashed var(--line);border-radius:12px}
+.ringc{border:3px solid var(--acc);border-radius:50%;background:transparent}
+.cardr{height:54%;border:2px solid var(--mute);border-radius:8px;background:var(--acc2);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--mute)}
+input[type=range]{width:100%;height:44px;accent-color:var(--acc)}
+input[type=number]{width:100%;min-height:48px;font-size:1.1rem;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+.seg{display:flex;gap:8px}.seg button{flex:1;min-height:48px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font-size:.95rem}
+.seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+label{display:block;font:600 .9rem "Trebuchet MS",Arial,sans-serif;margin:10px 0 2px}
+table{border-collapse:collapse;width:100%;font-size:.88rem}th,td{border-bottom:1px solid var(--line);padding:6px 4px;text-align:left}
+tr.hit td{background:var(--acc2);font-weight:700}
+.warn{color:#b3261e}.ok{color:var(--acc);font-weight:700}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px))}
+nav button{flex:1;min-height:56px;border:0;background:none;color:var(--mute);font-size:.72rem;border-radius:12px}
+nav button span{display:block;font-size:1.3rem}nav button.on{color:var(--acc);background:var(--acc2);font-weight:700}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.phone{display:flex;flex-direction:column;width:200px;height:340px;margin:10px auto;border:3px solid var(--ink);border-radius:26px;overflow:hidden;font:.78rem "Trebuchet MS",Arial,sans-serif;text-align:center}
+.phone div{display:flex;align-items:center;justify-content:center;padding:6px;flex:1}
+.phone .z3{background:var(--r);flex:1}.phone .z2{background:var(--y);flex:1.3}.phone .z1{background:var(--g);flex:1.7}
+</style>
+</head>
+<body>
+<div id="app">
+<main>
+<h1>Medidor de anillo</h1>
+<p class="mute">Calcula el diámetro interior de un anillo con la pantalla de tu celular. Hecho con Vue 3.4.21.</p>
+
+<!-- HERRAMIENTA -->
+<section v-if="tab==='tool'">
+  <div class="card" aria-live="polite">
+    <div class="mute">Diámetro interior</div>
+    <div class="big">{{ fmt(diam,1) }} <small style="font-size:1.1rem">mm</small></div>
+    <div v-if="diam===null" class="warn">Ingresa un valor mayor que cero.</div>
+    <div class="grid">
+      <div>Circunferencia<b>{{ fmt(circ2,1) }} mm</b></div>
+      <div>Talla<b>{{ near ? 'T ' + near.t : '—' }}</b></div>
+      <div>Talla EE. UU.<b>{{ near ? usTxt(near.us) : '—' }}</b></div>
+    </div>
+  </div>
+
+  <div class="card" v-if="mode==='screen'">
+    <div class="stage" role="img" aria-label="Tarjeta de calibración y círculo del anillo">
+      <div class="cardr" :style="{width:cardPx+'px'}">85,6 mm</div>
+      <div class="ringc" :style="{width:ringPx+'px',height:ringPx+'px'}"></div>
+    </div>
+    <p class="mute">Paso 1: pon una tarjeta bancaria sobre el rectángulo y ajusta hasta que coincida. Paso 2: ajusta el círculo al hueco de tu anillo.</p>
+  </div>
+
+  <div class="card">
+    <div class="seg" role="group" aria-label="Método de medición">
+      <button :class="{on:mode==='screen'}" @click="mode='screen'">Con la pantalla</button>
+      <button :class="{on:mode==='circ'}" @click="mode='circ'">Con un hilo</button>
+    </div>
+    <div v-if="mode==='screen'">
+      <label for="c1">Calibrar tarjeta: {{ cardPx }} px</label>
+      <input id="c1" type="range" min="150" max="420" step="1" v-model.number="cardPx">
+      <label for="c2">Diámetro del anillo: {{ fmt(dmm,1) }} mm</label>
+      <input id="c2" type="range" min="13" max="24.2" step="0.1" v-model.number="dmm">
+    </div>
+    <div v-else>
+      <label for="c3">Circunferencia del dedo o anillo (mm)</label>
+      <input id="c3" type="number" inputmode="decimal" min="1" step="0.1" v-model.number="circIn">
+      <p class="mute">Rodea el dedo con un hilo, marca el cruce y mide el largo con una regla.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Tallas cercanas</h3>
+    <table><tr><th>Talla</th><th>EE. UU.</th><th>Diámetro</th></tr>
+      <tr v-for="r in rows" :key="r.t" :class="{hit:r.hit}"><td>T {{ r.t }}</td><td>{{ r.us }}</td><td>{{ r.d.toFixed(1) }} mm</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- REQUERIMIENTOS -->
+<section v-if="tab==='req'">
+  <h2>1. Levantamiento de requerimientos</h2>
+  <p>Técnica: historias de usuario y lluvia de ideas con posibles usuarios (quien compra un anillo en línea y no conoce su talla).</p>
+  <div class="card"><h3>Funcionales</h3><ul>
+    <li><b>RF1.</b> Calibrar la escala de pantalla con una tarjeta de 85,6 mm.</li>
+    <li><b>RF2.</b> Mostrar un círculo ajustable entre 13 y 24,2 mm.</li>
+    <li><b>RF3.</b> Calcular diámetro, circunferencia y la talla más cercana (T 1 a T 36) con su equivalente en EE. UU.</li>
+    <li><b>RF4.</b> Permitir ingresar la circunferencia medida con un hilo.</li>
+    <li><b>RF5.</b> Mostrar una tabla de tallas según la tabla «Tallas y equivalencias», con la más cercana resaltada.</li>
+    <li><b>RF6.</b> Validar entradas y avisar si no son válidas.</li>
+  </ul></div>
+  <div class="card"><h3>No funcionales</h3><ul>
+    <li><b>RNF1. Usabilidad:</b> se usa con una mano; controles de al menos 44 px.</li>
+    <li><b>RNF2. Rendimiento:</b> el resultado cambia al instante al mover un control.</li>
+    <li><b>RNF3. Portabilidad:</b> funciona en navegadores modernos de celular y escritorio.</li>
+    <li><b>RNF4. Accesibilidad:</b> etiquetas en cada control, foco visible y modo oscuro.</li>
+    <li><b>RNF5. Disponibilidad:</b> un solo archivo, sin servidor ni registro.</li>
+    <li><b>RNF6. Precisión:</b> error esperado menor a ±0,5 mm si la calibración es correcta.</li>
+  </ul></div>
+  <h2>2. Análisis del sistema</h2>
+  <div class="card">
+    <p><b>Actor:</b> persona que quiere conocer su talla. <b>Casos de uso:</b> calibrar, medir, consultar tallas.</p>
+    <p><b>Flujo principal:</b> calibra con la tarjeta, ajusta el círculo al anillo, lee el resultado.</p>
+    <p><b>Flujo alterno:</b> si no tiene tarjeta, mide con un hilo e ingresa la circunferencia.</p>
+    <p><b>Fórmulas:</b> circunferencia = π × diámetro. Escala = píxeles de la tarjeta ÷ 85,6 mm. Talla = fila de la tabla «Tallas y equivalencias» (T 1 a T 36) cuyo diámetro interior está más cerca del medido.</p>
+    <p><b>Restricción:</b> la precisión depende de la calibración, porque cada pantalla tiene densidad distinta.</p>
+  </div>
+</section>
+
+<!-- THUMB ZONE -->
+<section v-if="tab==='thumb'">
+  <h2>Zona del pulgar (thumb zone)</h2>
+  <p>Con una sola mano el pulgar alcanza con comodidad la parte baja de la pantalla, llega con esfuerzo al centro y casi no llega arriba. Por eso se ubicaron así los elementos:</p>
+  <div class="phone" role="img" aria-label="Pantalla dividida en tres zonas de alcance del pulgar">
+    <div class="z3">Difícil: título y resultado (solo se leen)</div>
+    <div class="z2">Alcanzable: tabla y selector de método</div>
+    <div class="z1">Fácil: deslizadores y menú de navegación</div>
+  </div>
+  <div class="card"><ul>
+    <li><b>Menú inferior:</b> cinco pestañas en la zona fácil, para cambiar de sección sin soltar el teléfono.</li>
+    <li><b>Deslizadores y campo numérico:</b> son lo que más se toca, así que van abajo, cerca del pulgar.</li>
+    <li><b>Resultado:</b> arriba, porque solo se mira y no se toca; así la mano no lo tapa.</li>
+    <li><b>Selector de método:</b> en la zona media, se usa una vez por medición.</li>
+    <li><b>Tamaño táctil:</b> botones y deslizadores de 44 a 56 px de alto para evitar toques errados.</li>
+  </ul></div>
+  <h2>Explicación de la herramienta</h2>
+  <p>La pantalla no sabe cuántos milímetros mide en realidad. La tarjeta bancaria mide 85,6 mm en todo el mundo (norma ISO/IEC 7810), así que sirve de regla: al hacer coincidir su ancho en pantalla se obtiene la escala. Con esa escala, el círculo en pantalla representa un diámetro real, y se compara con el hueco del anillo.</p>
+</section>
+
+<!-- PRUEBAS -->
+<section v-if="tab==='test'">
+  <h2>4. Pruebas</h2>
+  <p>Pruebas unitarias de las funciones de cálculo. Se ejecutan al abrir la página: {{ passed }} de {{ tests.length }} aprobadas.</p>
+  <div class="card"><table><tr><th>Caso</th><th>Esperado</th><th>Obtenido</th><th>Estado</th></tr>
+    <tr v-for="t in tests" :key="t.n"><td>{{ t.n }}</td><td>{{ t.e }}</td><td>{{ t.g }}</td><td :class="t.ok?'ok':'warn'">{{ t.ok?'Aprobada':'Falla' }}</td></tr>
+  </table></div>
+  <h3>Pruebas funcionales manuales</h3>
+  <ul>
+    <li>Calibrar con una tarjeta real y comparar con un anillo de talla conocida (T 14 = 17,2 mm = 7 EE. UU.).</li>
+    <li>Escribir 0 o dejar vacío el campo de circunferencia: debe aparecer el aviso.</li>
+    <li>Probar en celular vertical, horizontal y en modo oscuro.</li>
+  </ul>
+</section>
+
+<!-- DOCUMENTACIÓN -->
+<section v-if="tab==='docs'">
+  <h2>3. Construcción</h2>
+  <div class="card"><ul>
+    <li><b>Framework:</b> Vue 3, versión 3.4.21 (build global desde cdnjs).</li>
+    <li><b>Lenguajes:</b> HTML5, CSS3 y JavaScript ES2020.</li>
+    <li><b>Arquitectura:</b> una sola página con estado reactivo y propiedades calculadas; las funciones de cálculo son puras y por eso se pueden probar.</li>
+  </ul></div>
+  <h2>5. Documentación: instrucciones de uso</h2>
+  <ol>
+    <li>Abre la pestaña <b>Medir</b>.</li>
+    <li>Pon una tarjeta bancaria sobre el rectángulo y mueve «Calibrar tarjeta» hasta que tengan el mismo ancho.</li>
+    <li>Pon tu anillo sobre el círculo y mueve «Diámetro del anillo» hasta que el hueco coincida con el borde interior.</li>
+    <li>Lee arriba el diámetro, la circunferencia y las tallas.</li>
+    <li>Sin tarjeta: elige «Con un hilo», escribe la circunferencia en milímetros y lee el resultado.</li>
+  </ol>
+  <p class="mute">Las tallas son aproximadas; si estás entre dos, elige la mayor para dedos con nudillos anchos.</p>
+</section>
+</main>
+
+<nav aria-label="Secciones">
+  <button v-for="t in tabs" :key="t.k" :class="{on:tab===t.k}" :aria-current="tab===t.k?'page':null" @click="tab=t.k">{{ t.l }}</button>
+</nav>
+</div>
+
+<script>
+const PI = Math.PI, CARD_MM = 85.6;
+const valid = n => typeof n === 'number' && Number.isFinite(n) && n > 0;
+const diamFromCirc = c => valid(c) ? c / PI : null;
+const circFromDiam = d => valid(d) ? d * PI : null;
+const SIZES = [[13,1],[13.4,2],[13.7,2.5],[14,3],[14.3,3.5],[14.6,3.75],[15,4],[15.3,4.5],[15.6,5],[15.9,5.5],[16.2,5.75],[16.5,6],[16.8,6.5],[17.2,7],[17.5,7.5],[17.8,7.75],[18.1,8],[18.4,8.5],[18.8,8.75],[19.1,9],[19.4,9.5],[19.7,10],[20,10.5],[20.3,10.75],[20.6,11],[21,11.5],[21.3,12],[21.6,12.5],[22,12.75],[22.3,13],[22.6,13.5],[22.9,13.75],[23.2,14],[23.5,14.5],[23.9,15],[24.2,15.5]]; // [diámetro mm, talla EE. UU.]
+const nearestIdx = d => valid(d) ? SIZES.reduce((b, s, i) => Math.abs(s[0] - d) < Math.abs(SIZES[b][0] - d) ? i : b, 0) : -1;
+const pxPerMm = px => valid(px) ? px / CARD_MM : null;
+
+const { createApp, ref, computed } = Vue;
+createApp({
+  setup() {
+    const tab = ref('tool'), mode = ref('screen');
+    const cardPx = ref(300), dmm = ref(17.3), circIn = ref(54.4);
+    const tabs = [{k:'tool',l:'Medir'},{k:'req',l:'Requisitos'},{k:'thumb',l:'Pulgar'},{k:'test',l:'Pruebas'},{k:'docs',l:'Guía'}];
+    const diam = computed(() => mode.value === 'screen' ? (valid(dmm.value) ? dmm.value : null) : diamFromCirc(circIn.value));
+    const circ2 = computed(() => circFromDiam(diam.value));
+    const idx = computed(() => nearestIdx(diam.value));
+    const near = computed(() => idx.value < 0 ? null : { t: idx.value + 1, d: SIZES[idx.value][0], us: SIZES[idx.value][1] });
+    const usTxt = v => { const w = Math.floor(v), f = v - w; return w + (f === 0.5 ? ' 1/2' : f === 0.75 ? ' 3/4' : f === 0.25 ? ' 1/4' : ''); };
+    const ringPx = computed(() => Math.round((dmm.value || 0) * pxPerMm(cardPx.value)));
+    const rows = computed(() => {
+      const c = Math.min(Math.max(idx.value < 0 ? 13 : idx.value, 2), SIZES.length - 3);
+      return [-2,-1,0,1,2].map(k => { const i = c + k; return { t: i + 1, us: usTxt(SIZES[i][1]), d: SIZES[i][0], hit: i === idx.value }; });
+    });
+    const fmt = (n, d) => n === null ? '—' : n.toFixed(d).replace('.', ',');
+
+    const cases = [
+      ['Circunferencia 54,4 mm → diámetro', '17,32', diamFromCirc(54.4), 17.32, 0.01],
+      ['Diámetro 17,3 mm → circunferencia', '54,35', circFromDiam(17.3), 54.35, 0.01],
+      ['Diámetro 17,3 mm → talla T', '14', nearestIdx(17.3) + 1, 14, 0],
+      ['Diámetro 17,3 mm → talla EE. UU.', '7', SIZES[nearestIdx(17.3)][1], 7, 0],
+      ['Diámetro 13 mm → talla T', '1', nearestIdx(13) + 1, 1, 0],
+      ['Diámetro 24,2 mm → talla T', '36', nearestIdx(24.2) + 1, 36, 0],
+      ['Tarjeta de 342,4 px → px por mm', '4', pxPerMm(342.4), 4, 0.001],
+      ['Entrada negativa', 'null', circFromDiam(-5), null, 0],
+      ['Entrada no numérica', 'null', diamFromCirc(NaN), null, 0]
+    ];
+    const tests = cases.map(([n, e, g, x, tol], i) => ({ n: (i+1) + '. ' + n, e, g: g === null ? 'null' : (+g.toFixed(3)).toString().replace('.', ','), ok: x === null ? g === null : g !== null && Math.abs(g - x) <= tol }));
+    const passed = tests.filter(t => t.ok).length;
+
+    return { tab, mode, cardPx, dmm, circIn, tabs, diam, circ2, near, usTxt, ringPx, rows, fmt, tests, passed, PI };
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

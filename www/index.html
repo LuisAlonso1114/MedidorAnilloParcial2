@@ -22,11 +22,13 @@ p,li{max-width:62ch}.mute{color:var(--mute);font-size:.9rem}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .grid div{background:var(--acc2);border-radius:10px;padding:8px;text-align:center;font-size:.8rem}
 .grid b{display:block;font-size:1.05rem}
-.stage{height:150px;display:flex;align-items:center;justify-content:center;gap:24px;overflow:hidden;border:1px dashed var(--line);border-radius:12px}
-.ringc{border:3px solid var(--acc);border-radius:50%;background:transparent}
-.cardr{height:54%;border:2px solid var(--mute);border-radius:8px;background:var(--acc2);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--mute)}
+[v-cloak]{display:none}.stage{height:210px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px dashed var(--line);border-radius:12px;touch-action:none;user-select:none;-webkit-user-select:none;cursor:ns-resize}
+.row{display:flex;gap:8px;align-items:center}.row input{flex:1}.row button{min-width:48px;min-height:48px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font-size:1.4rem}
+.ringc{border:2px solid var(--acc);border-radius:50%;background:transparent}
+.cardr{height:44px;border:2px solid var(--mute);border-radius:8px;background:var(--acc2);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--mute)}
+.cal{width:100%;min-height:48px;margin-top:12px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font-size:.95rem}.bleed{margin:10px -31px;overflow:hidden}.bleed .cardr{border-left:0;border-radius:0 8px 8px 0}
 input[type=range]{width:100%;height:44px;accent-color:var(--acc)}
-input[type=number]{width:100%;min-height:48px;font-size:1.1rem;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
+input[type=number],input[type=text]{width:100%;min-height:48px;font-size:1.1rem;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink)}
 .seg{display:flex;gap:8px}.seg button{flex:1;min-height:48px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;font-size:.95rem}
 .seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
 label{display:block;font:600 .9rem "Trebuchet MS",Arial,sans-serif;margin:10px 0 2px}
@@ -43,7 +45,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app" v-cloak>
 <main>
 <h1>Medidor de anillo</h1>
 <p class="mute">Calcula el diámetro interior de un anillo con la pantalla de tu celular. Hecho con Vue 3.4.21.</p>
@@ -53,7 +55,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
   <div class="card" aria-live="polite">
     <div class="mute">Diámetro interior</div>
     <div class="big">{{ fmt(diam,1) }} <small style="font-size:1.1rem">mm</small></div>
-    <div v-if="diam===null" class="warn">Ingresa un valor mayor que cero.</div>
+    <div v-if="outRange" class="warn">Fuera de la tabla (T 1 a T 36): se muestra la talla más cercana.</div>
     <div class="grid">
       <div>Circunferencia<b>{{ fmt(circ2,1) }} mm</b></div>
       <div>Talla<b>{{ near ? 'T ' + near.t : '—' }}</b></div>
@@ -61,29 +63,29 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
     </div>
   </div>
 
-  <div class="card" v-if="mode==='screen'">
-    <div class="stage" role="img" aria-label="Tarjeta de calibración y círculo del anillo">
-      <div class="cardr" :style="{width:cardPx+'px'}">85,6 mm</div>
+  <div class="card">
+    <div class="stage" role="img" aria-label="Zona del anillo: pellizca para cambiar el tamaño" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @wheel.prevent="onWheel">
       <div class="ringc" :style="{width:ringPx+'px',height:ringPx+'px'}"></div>
     </div>
-    <p class="mute">Paso 1: pon una tarjeta bancaria sobre el rectángulo y ajusta hasta que coincida. Paso 2: ajusta el círculo al hueco de tu anillo.</p>
+    <p class="mute">Pon tu anillo sobre el círculo y pellizca con dos dedos para agrandarlo o reducirlo hasta que coincida con el borde interior.</p>
   </div>
 
   <div class="card">
-    <div class="seg" role="group" aria-label="Método de medición">
-      <button :class="{on:mode==='screen'}" @click="mode='screen'">Con la pantalla</button>
-      <button :class="{on:mode==='circ'}" @click="mode='circ'">Con un hilo</button>
-    </div>
-    <div v-if="mode==='screen'">
-      <label for="c1">Calibrar tarjeta: {{ cardPx }} px</label>
-      <input id="c1" type="range" min="150" max="420" step="1" v-model.number="cardPx">
-      <label for="c2">Diámetro del anillo: {{ fmt(dmm,1) }} mm</label>
+    <label for="c2">Diámetro del anillo: {{ fmt(dmm,1) }} mm</label>
+    <div class="row">
+      <button aria-label="Reducir 0,1 mm" @click="nudge(-0.1)">−</button>
       <input id="c2" type="range" min="13" max="24.2" step="0.1" v-model.number="dmm">
+      <button aria-label="Aumentar 0,1 mm" @click="nudge(0.1)">+</button>
     </div>
-    <div v-else>
-      <label for="c3">Circunferencia del dedo o anillo (mm)</label>
-      <input id="c3" type="number" inputmode="decimal" min="1" step="0.1" v-model.number="circIn">
-      <p class="mute">Rodea el dedo con un hilo, marca el cruce y mide el largo con una regla.</p>
+    <label for="c3">O escribe la circunferencia medida con un hilo (mm)</label>
+    <input id="c3" type="text" inputmode="decimal" :value="circText" @input="onCirc($event.target.value)">
+    <div v-if="circBad" class="warn">Ingresa un valor mayor que cero.</div>
+    <button class="cal" @click="showCal=!showCal">{{ showCal ? 'Cerrar calibración' : 'Calibrar escala (opcional)' }}</button>
+    <div v-if="showCal">
+      <div class="bleed"><div class="cardr" :style="{width:cardPx+'px'}">lado corto de la tarjeta: 54 mm</div></div>
+      <label for="c1">Ancho de la barra: {{ cardPx }} px</label>
+      <input id="c1" type="range" min="150" max="400" step="1" v-model.number="cardPx">
+      <p class="mute">Apoya el lado corto de una tarjeta bancaria contra el borde izquierdo de la pantalla y ajusta hasta que la barra mida lo mismo. Se guarda en el teléfono.</p>
     </div>
   </div>
 
@@ -100,11 +102,12 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
   <h2>1. Levantamiento de requerimientos</h2>
   <p>Técnica: historias de usuario y lluvia de ideas con posibles usuarios (quien compra un anillo en línea y no conoce su talla).</p>
   <div class="card"><h3>Funcionales</h3><ul>
-    <li><b>RF1.</b> Calibrar la escala de pantalla con una tarjeta de 85,6 mm.</li>
+    <li><b>RF1.</b> Calibrar de forma opcional la escala con el lado corto de una tarjeta bancaria (54 mm); la escala se guarda.</li>
     <li><b>RF2.</b> Mostrar un círculo ajustable entre 13 y 24,2 mm.</li>
     <li><b>RF3.</b> Calcular diámetro, circunferencia y la talla más cercana (T 1 a T 36) con su equivalente en EE. UU.</li>
     <li><b>RF4.</b> Permitir ingresar la circunferencia medida con un hilo.</li>
     <li><b>RF5.</b> Mostrar una tabla de tallas según la tabla «Tallas y equivalencias», con la más cercana resaltada.</li>
+    <li><b>RF7.</b> Cambiar el tamaño del círculo con el gesto de pellizco (zoom) sobre la zona del anillo, además del deslizador y los botones − y +.</li>
     <li><b>RF6.</b> Validar entradas y avisar si no son válidas.</li>
   </ul></div>
   <div class="card"><h3>No funcionales</h3><ul>
@@ -120,7 +123,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
     <p><b>Actor:</b> persona que quiere conocer su talla. <b>Casos de uso:</b> calibrar, medir, consultar tallas.</p>
     <p><b>Flujo principal:</b> calibra con la tarjeta, ajusta el círculo al anillo, lee el resultado.</p>
     <p><b>Flujo alterno:</b> si no tiene tarjeta, mide con un hilo e ingresa la circunferencia.</p>
-    <p><b>Fórmulas:</b> circunferencia = π × diámetro. Escala = píxeles de la tarjeta ÷ 85,6 mm. Talla = fila de la tabla «Tallas y equivalencias» (T 1 a T 36) cuyo diámetro interior está más cerca del medido.</p>
+    <p><b>Fórmulas:</b> circunferencia = π × diámetro. Escala = píxeles de la barra ÷ 53,98 mm (lado corto de una tarjeta bancaria). Talla = fila de la tabla «Tallas y equivalencias» (T 1 a T 36) cuyo diámetro interior está más cerca del medido.</p>
     <p><b>Restricción:</b> la precisión depende de la calibración, porque cada pantalla tiene densidad distinta.</p>
   </div>
 </section>
@@ -131,18 +134,18 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
   <p>Con una sola mano el pulgar alcanza con comodidad la parte baja de la pantalla, llega con esfuerzo al centro y casi no llega arriba. Por eso se ubicaron así los elementos:</p>
   <div class="phone" role="img" aria-label="Pantalla dividida en tres zonas de alcance del pulgar">
     <div class="z3">Difícil: título y resultado (solo se leen)</div>
-    <div class="z2">Alcanzable: tabla y selector de método</div>
+    <div class="z2">Alcanzable: círculo de pellizco y tabla</div>
     <div class="z1">Fácil: deslizadores y menú de navegación</div>
   </div>
   <div class="card"><ul>
     <li><b>Menú inferior:</b> cinco pestañas en la zona fácil, para cambiar de sección sin soltar el teléfono.</li>
     <li><b>Deslizadores y campo numérico:</b> son lo que más se toca, así que van abajo, cerca del pulgar.</li>
     <li><b>Resultado:</b> arriba, porque solo se mira y no se toca; así la mano no lo tapa.</li>
-    <li><b>Selector de método:</b> en la zona media, se usa una vez por medición.</li>
+    <li><b>Zona de pellizco:</b> el círculo está en el centro, donde el pulgar y el índice hacen el gesto con comodidad; los botones − y + dan el ajuste fino abajo.</li>
     <li><b>Tamaño táctil:</b> botones y deslizadores de 44 a 56 px de alto para evitar toques errados.</li>
   </ul></div>
   <h2>Explicación de la herramienta</h2>
-  <p>La pantalla no sabe cuántos milímetros mide en realidad. La tarjeta bancaria mide 85,6 mm en todo el mundo (norma ISO/IEC 7810), así que sirve de regla: al hacer coincidir su ancho en pantalla se obtiene la escala. Con esa escala, el círculo en pantalla representa un diámetro real, y se compara con el hueco del anillo.</p>
+  <p>La pantalla no sabe cuántos milímetros mide en realidad. Las tarjetas bancarias miden 85,6 × 53,98 mm en todo el mundo (norma ISO/IEC 7810), así que sirven de regla: al hacer coincidir su lado corto con una barra en pantalla se obtiene la escala, que queda guardada. Con esa escala, el círculo en pantalla representa un diámetro real, y se compara con el hueco del anillo.</p>
 </section>
 
 <!-- PRUEBAS -->
@@ -156,6 +159,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
   <ul>
     <li>Calibrar con una tarjeta real y comparar con un anillo de talla conocida (T 14 = 17,2 mm = 7 EE. UU.).</li>
     <li>Escribir 0 o dejar vacío el campo de circunferencia: debe aparecer el aviso.</li>
+    <li>Pellizcar sobre el círculo: debe crecer y encogerse sin mover ni ampliar la pantalla.</li>
     <li>Probar en celular vertical, horizontal y en modo oscuro.</li>
   </ul>
 </section>
@@ -171,10 +175,10 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
   <h2>5. Documentación: instrucciones de uso</h2>
   <ol>
     <li>Abre la pestaña <b>Medir</b>.</li>
-    <li>Pon una tarjeta bancaria sobre el rectángulo y mueve «Calibrar tarjeta» hasta que tengan el mismo ancho.</li>
-    <li>Pon tu anillo sobre el círculo y mueve «Diámetro del anillo» hasta que el hueco coincida con el borde interior.</li>
+    <li>Pon tu anillo sobre el círculo y pellizca con dos dedos sobre esa zona (o usa el deslizador y los botones − y +) hasta que el hueco coincida con el borde interior.</li>
+    <li>Si el tamaño no coincide con la realidad, pulsa «Calibrar escala», apoya el lado corto de una tarjeta bancaria contra el borde izquierdo de la pantalla y ajusta la barra hasta que mida lo mismo.</li>
     <li>Lee arriba el diámetro, la circunferencia y las tallas.</li>
-    <li>Sin tarjeta: elige «Con un hilo», escribe la circunferencia en milímetros y lee el resultado.</li>
+    <li>Con un hilo: escribe la circunferencia en milímetros en su campo y el círculo se ajusta solo.</li>
   </ol>
   <p class="mute">Las tallas son aproximadas; si estás entre dos, elige la mayor para dedos con nudillos anchos.</p>
 </section>
@@ -186,7 +190,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-of
 </div>
 
 <script>
-const PI = Math.PI, CARD_MM = 85.6;
+const PI = Math.PI, CARD_MM = 53.98;
 const valid = n => typeof n === 'number' && Number.isFinite(n) && n > 0;
 const diamFromCirc = c => valid(c) ? c / PI : null;
 const circFromDiam = d => valid(d) ? d * PI : null;
@@ -194,16 +198,28 @@ const SIZES = [[13,1],[13.4,2],[13.7,2.5],[14,3],[14.3,3.5],[14.6,3.75],[15,4],[
 const nearestIdx = d => valid(d) ? SIZES.reduce((b, s, i) => Math.abs(s[0] - d) < Math.abs(SIZES[b][0] - d) ? i : b, 0) : -1;
 const pxPerMm = px => valid(px) ? px / CARD_MM : null;
 
-const { createApp, ref, computed } = Vue;
+const clampDm = v => Math.min(24.2, Math.max(13, Math.round(v * 10) / 10));
+const { createApp, ref, computed, watch } = Vue;
 createApp({
   setup() {
-    const tab = ref('tool'), mode = ref('screen');
-    const cardPx = ref(300), dmm = ref(17.3), circIn = ref(54.4);
+    const tab = ref('tool'), showCal = ref(false);
     const tabs = [{k:'tool',l:'Medir'},{k:'req',l:'Requisitos'},{k:'thumb',l:'Pulgar'},{k:'test',l:'Pruebas'},{k:'docs',l:'Guía'}];
-    const diam = computed(() => mode.value === 'screen' ? (valid(dmm.value) ? dmm.value : null) : diamFromCirc(circIn.value));
+    const saved = (() => { try { return Number(localStorage.getItem('cardPx')); } catch (e) { return 0; } })();
+    const cardPx = ref(saved >= 150 && saved <= 400 ? saved : 340), dmm = ref(17.3), circText = ref('');
+    watch(cardPx, v => { try { localStorage.setItem('cardPx', v); } catch (e) {} });
+    watch(tab, () => window.scrollTo(0, 0));
+
+    let fromCirc = false;
+    watch(dmm, v => { if (!fromCirc) circText.value = (v * PI).toFixed(1); }, { immediate: true, flush: 'sync' });
+    const parseNum = t => parseFloat(String(t).replace(',', '.'));
+    const onCirc = t => { circText.value = t; const c = parseNum(t); if (valid(c)) { fromCirc = true; dmm.value = c / PI; fromCirc = false; } };
+    const circBad = computed(() => !valid(parseNum(circText.value)));
+
+    const diam = computed(() => valid(dmm.value) ? dmm.value : null);
     const circ2 = computed(() => circFromDiam(diam.value));
     const idx = computed(() => nearestIdx(diam.value));
     const near = computed(() => idx.value < 0 ? null : { t: idx.value + 1, d: SIZES[idx.value][0], us: SIZES[idx.value][1] });
+    const outRange = computed(() => diam.value !== null && (diam.value < 12.8 || diam.value > 24.4));
     const usTxt = v => { const w = Math.floor(v), f = v - w; return w + (f === 0.5 ? ' 1/2' : f === 0.75 ? ' 3/4' : f === 0.25 ? ' 1/4' : ''); };
     const ringPx = computed(() => Math.round((dmm.value || 0) * pxPerMm(cardPx.value)));
     const rows = computed(() => {
@@ -212,21 +228,33 @@ createApp({
     });
     const fmt = (n, d) => n === null ? '—' : n.toFixed(d).replace('.', ',');
 
+    // Gesto de pellizco (zoom) sobre la zona del anillo
+    const ptrs = new Map(); let d0 = 0, v0 = 0;
+    const dist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
+    const onDown = e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (x) {} ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2) { d0 = dist(); v0 = dmm.value; } };
+    const onMove = e => { if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptrs.size === 2 && d0 > 10) dmm.value = clampDm(v0 * dist() / d0); };
+    const onUp = e => { ptrs.delete(e.pointerId); d0 = 0; if (ptrs.size === 2) { d0 = dist(); v0 = dmm.value; } };
+    const onWheel = e => { dmm.value = clampDm(dmm.value * (e.deltaY < 0 ? 1.02 : 0.98)); };
+    const nudge = d => { dmm.value = clampDm(dmm.value + d); };
+
     const cases = [
       ['Circunferencia 54,4 mm → diámetro', '17,32', diamFromCirc(54.4), 17.32, 0.01],
       ['Diámetro 17,3 mm → circunferencia', '54,35', circFromDiam(17.3), 54.35, 0.01],
+      ['Lado corto de tarjeta de 215,92 px → px por mm', '4', pxPerMm(215.92), 4, 0.001],
       ['Diámetro 17,3 mm → talla T', '14', nearestIdx(17.3) + 1, 14, 0],
       ['Diámetro 17,3 mm → talla EE. UU.', '7', SIZES[nearestIdx(17.3)][1], 7, 0],
       ['Diámetro 13 mm → talla T', '1', nearestIdx(13) + 1, 1, 0],
       ['Diámetro 24,2 mm → talla T', '36', nearestIdx(24.2) + 1, 36, 0],
-      ['Tarjeta de 342,4 px → px por mm', '4', pxPerMm(342.4), 4, 0.001],
+      ['Zoom máximo limitado a 24,2 mm', '24,2', clampDm(30), 24.2, 0],
+      ['Zoom mínimo limitado a 13 mm', '13', clampDm(5), 13, 0],
+      ['Zoom redondea a 0,1 mm', '17,3', clampDm(17.34), 17.3, 0],
       ['Entrada negativa', 'null', circFromDiam(-5), null, 0],
       ['Entrada no numérica', 'null', diamFromCirc(NaN), null, 0]
     ];
     const tests = cases.map(([n, e, g, x, tol], i) => ({ n: (i+1) + '. ' + n, e, g: g === null ? 'null' : (+g.toFixed(3)).toString().replace('.', ','), ok: x === null ? g === null : g !== null && Math.abs(g - x) <= tol }));
     const passed = tests.filter(t => t.ok).length;
 
-    return { tab, mode, cardPx, dmm, circIn, tabs, diam, circ2, near, usTxt, ringPx, rows, fmt, tests, passed, PI };
+    return { tab, showCal, cardPx, dmm, circText, onCirc, circBad, tabs, diam, circ2, near, usTxt, outRange, ringPx, rows, fmt, tests, passed, onDown, onMove, onUp, onWheel, nudge };
   }
 }).mount('#app');
 </script>
